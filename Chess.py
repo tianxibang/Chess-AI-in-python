@@ -74,7 +74,6 @@ class ChessLogic:
         return False
     
     def is_check(self, king_bitboard, player):
-        
         return
     
 
@@ -180,7 +179,6 @@ class ChessLogic:
                 if edge_mask and (test & edge_mask):
                     break
                 test = (test << shift) if shift > 0 else (test >> -shift)
-
                 # Pass occupancies to check_block
                 result = self.check_block(test, player, white_occ, black_occ)
 
@@ -321,13 +319,26 @@ class ChessLogic:
     
     def update_position(self, move):
         print(f"Updating position: {move}")
-        original_pos = move[:2]
+        original_pos = move[0:2]
         new_pos = move[2:4]
+        promotion = move[4:5]
+        print("promotion value:", promotion)
         for piece in self.current_board:
             if new_pos in self.current_board.get(piece):
                 print("Removing Piece:", piece)
                 self.current_board[piece].remove(new_pos)
-            if original_pos in self.current_board.get(piece):
+            if promotion:
+                print("Moving and Promoting")
+                print(original_pos)
+                if self.current_move+1 % 2 == 1:
+                    # white
+                    self.current_board[piece].remove(original_pos)
+                    self.current_board[promotion.upper()].append(new_pos)
+                else:
+                    # black
+                    self.current_board[piece].remove(original_pos)
+                    self.current_board[promotion.lower()].append(new_pos)
+            elif original_pos in self.current_board.get(piece):
                 print("Piece found:", piece)
                 self.current_board[piece].remove(original_pos)
                 self.current_board[piece].append(new_pos)
@@ -337,13 +348,14 @@ class ChessLogic:
     def input_move(self, move, moveset):
         original_pos = move[:2]
         new_pos = move[2:4]
+        promotion = move[4:5]
         original_pos_bit = self.turn_notation_binary(original_pos)
         new_pos_bit = self.turn_notation_binary(new_pos)
         for pieces in moveset:
             for piece in pieces:
                 if original_pos_bit == piece[0]:
                     for destination in piece[1]:
-                        if new_pos_bit == destination:
+                        if new_pos_bit == destination[0] if promotion else destination:
                             self.update_position(move)
                             return
         raise Exception("Invalid move")
@@ -365,7 +377,7 @@ class ChessLogic:
             for move in piece:
                 for newpos in move[1]:
                     print(self.bitboard_to_square(move[0]), end="")
-                    print(self.bitboard_to_square(newpos), end=", ")
+                    print(self.bitboard_to_square(newpos), "promote" if isinstance(newpos, tuple) else "", end=", ")
             print("\n")
 
 
