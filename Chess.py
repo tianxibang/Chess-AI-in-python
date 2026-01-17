@@ -27,7 +27,6 @@ class ChessLogic:
         for r in range(1, 9):
             for f_idx, f_char in enumerate(files):
                 # Calculate the bitmask once on startup
-                # (Logic matches your existing binary mapping)
                 shift = ((r - 1) * 8) + (7 - f_idx)
                 self.notation_map[f_char + str(r)] = 1 << shift
 
@@ -39,14 +38,16 @@ class ChessLogic:
         #black lower case, white upper case
         starting_board_dict ={
             "r":["a8","h8"], "n":["b8","g8"], "b":["c8", "f8"], "k":["e8"], "q":["d8"],
-            "p":["a7","b7","c7","d7", "e7","f7","g7","h7"],
+            "p":["a7","b7","c7","d7", "f7","g7","h7"],
             "R":["a1","h1"], "N":["b1","g1"], "B":["c1", "f1"], "K":["e1"], "Q":["d1"],
-            "P":["a2","b2","c2","d2","e2","f2","g2","h2"],
+            "P":["a2","b2","c2","d2","e7","f2","g2","h2"],
             
         }        
         return starting_board_dict
 
     def bitboard_to_square(sefl, bitboard):
+        if isinstance(bitboard, tuple):
+            bitboard = bitboard[0]
         index = bitboard.bit_length() - 1
         file = chr(ord('a') + (7 - (index % 8)))  # flip horizontal
         rank = str((index // 8) + 1)             # rank 1 = bottom
@@ -76,13 +77,6 @@ class ChessLogic:
         
         return
     
-    def get_attacking_bitboard(self, player):
-        attacking_moves = self.return_possible_moves("black" if player == "white" else "white")
-        attacking_bitboard = 0
-        for piece in attacking_moves:
-            for move in piece:
-                attacking_bitboard += self.turn_notation_binary(move[2:4])
-        return attacking_bitboard
 
     def check_block(self, test_bitmap, player, white_occ, black_occ):
         # Determine "own" pieces based on player
@@ -125,8 +119,7 @@ class ChessLogic:
             else:
                 list_of_moves.append(test)
 
-        originalsquare = self.bitboard_to_square(move_piece_bitboard)
-        return (originalsquare + self.bitboard_to_square(move) for move in list_of_moves)
+        return (move_piece_bitboard, tuple(list_of_moves))
 
     def return_knight_moves(self, move_piece_bitboard, player, white_occ, black_occ):
         list_of_moves = []
@@ -151,8 +144,7 @@ class ChessLogic:
             else:
                 list_of_moves.append(test)
 
-        originalsquare = self.bitboard_to_square(move_piece_bitboard)
-        return (originalsquare + self.bitboard_to_square(move) for move in list_of_moves)
+        return (move_piece_bitboard, tuple(list_of_moves))
 
     def return_straight_moves(self, move_piece_bitboard, player, white_occ, black_occ):
         list_of_moves = []
@@ -176,8 +168,7 @@ class ChessLogic:
                 else:
                     list_of_moves.append(test)
 
-        originalsquare = self.bitboard_to_square(move_piece_bitboard)
-        return (originalsquare + self.bitboard_to_square(move) for move in list_of_moves)
+        return (move_piece_bitboard, tuple(list_of_moves))
       
     def return_diagonal_moves(self, move_piece_bitboard, player, white_occ, black_occ):
         list_of_moves = []
@@ -201,8 +192,7 @@ class ChessLogic:
                 else:
                     list_of_moves.append(test)
 
-        originalsquare = self.bitboard_to_square(move_piece_bitboard)
-        return (originalsquare + self.bitboard_to_square(move) for move in list_of_moves)
+        return (move_piece_bitboard, tuple(list_of_moves))
 
     def return_pawn_moves(self, move_piece_bitboard, player, white_occ, black_occ):
         list_of_moves = []
@@ -212,7 +202,11 @@ class ChessLogic:
             # 1. Forward Move (1 square)
             test = move_piece_bitboard << 8
             if (test != 0 and test < 18446744073709551616) and not (test & both_occ):
-                list_of_moves.append(test)   
+                # Promotion check
+                if test & RANK_EIGHT != 0:
+                    list_of_moves.append((test, "promote"))
+                else:
+                    list_of_moves.append(test)
                 
                 # 2. Double Forward Move (from Rank 2)
                 if move_piece_bitboard & RANK_TWO:
@@ -220,25 +214,35 @@ class ChessLogic:
                     if not (test_double & both_occ):
                         list_of_moves.append(test_double)
 
+                
             # 3. Capture Up-Left (Shift 9)
             # Must NOT be on File A to capture left
             if not (move_piece_bitboard & FILE_A):
                 capture_left = move_piece_bitboard << 9
                 if capture_left & black_occ:
-                    list_of_moves.append(capture_left)
+                    if capture_left & RANK_EIGHT != 0:
+                        list_of_moves.append((capture_left, "promote"))
+                    else:
+                        list_of_moves.append(capture_left)
             
             # 4. Capture Up-Right (Shift 7)
             # Must NOT be on File H to capture right
             if not (move_piece_bitboard & FILE_H):
                 capture_right = move_piece_bitboard << 7
                 if capture_right & black_occ:
-                    list_of_moves.append(capture_right)
-
+                    if capture_right & RANK_EIGHT != 0:
+                        list_of_moves.append((capture_right, "promote"))
+                    else:
+                        list_of_moves.append(capture_right)
         else:
             # 1. Forward Move (1 square)
             test = move_piece_bitboard >> 8
             if (test != 0 and test < 18446744073709551616) and not (test & both_occ):
-                list_of_moves.append(test)   
+                # Promotion check
+                if test & RANK_EIGHT != 0:
+                    list_of_moves.append((test, "promote"))
+                else:
+                    list_of_moves.append(test)
                 
                 # 2. Double Forward Move (from Rank 7)
                 if move_piece_bitboard & RANK_SEVEN:
@@ -250,24 +254,29 @@ class ChessLogic:
             # Must NOT be on File A to capture left
             if not (move_piece_bitboard & FILE_A):
                 capture_left = move_piece_bitboard >> 9
-                if capture_left & black_occ:
-                    list_of_moves.append(capture_left)
+                if capture_left & white_occ:
+                    if capture_left & RANK_ONE != 0:
+                        list_of_moves.append((capture_left, "promote"))
+                    else:
+                        list_of_moves.append(capture_left)
             
             # 4. Capture Up-Right (Shift 7)
             # Must NOT be on File H to capture right
             if not (move_piece_bitboard & FILE_H):
                 capture_right = move_piece_bitboard >> 7
-                if capture_right & black_occ:
-                    list_of_moves.append(capture_right)
+                if capture_right & white_occ:
+                    if capture_left & RANK_ONE != 0:
+                        list_of_moves.append((capture_right, "promote"))
+                    else:
+                        list_of_moves.append(capture_right)
 
-        originalsquare = self.bitboard_to_square(move_piece_bitboard)
-        return (originalsquare + self.bitboard_to_square(move) for move in list_of_moves)
+        return (move_piece_bitboard, tuple(list_of_moves))
     
     def get_single_piece_bitboard(self, bitboard):
         single_piece_bitboard_list = []
         
         while bitboard:
-            # 1. Isolate the rightmost bit (piece) instantly
+            # 1. Isolate the rightmost bit (piece)
             lsb = bitboard & -bitboard
             single_piece_bitboard_list.append(lsb)
             
@@ -282,26 +291,30 @@ class ChessLogic:
         black_occ = self.make_bitboard_of_all_pieces_by_player("black")
 
         # 2. Pass these into the move functions
-        Q_moves_notation = set()
-        for Qpos in self.get_single_piece_bitboard(self.make_bitboard("Q" if player == "white" else "q")): 
-            Q_moves_notation.update(self.return_diagonal_moves(Qpos, player, white_occ, black_occ))
-            Q_moves_notation.update(self.return_straight_moves(Qpos, player, white_occ, black_occ))
+        Q_moves_notation = list()
+        for Qpos in self.get_single_piece_bitboard(self.make_bitboard("Q" if player == "white" else "q")):
+            diag = (self.return_diagonal_moves(Qpos, player, white_occ, black_occ))
+            stra = (self.return_straight_moves(Qpos, player, white_occ, black_occ))
+            combined = diag[0], diag[1] + stra[1]
+            Q_moves_notation.append(combined)
 
-        R_moves_notation = set()
+        R_moves_notation = list()
         for Rpos in self.get_single_piece_bitboard(self.make_bitboard("R" if player == "white" else "r")):
-            R_moves_notation.update(self.return_straight_moves(Rpos, player, white_occ, black_occ))
+            R_moves_notation.append(self.return_straight_moves(Rpos, player, white_occ, black_occ))
 
-        B_moves_notation = set()
+        B_moves_notation = list()
         for Rpos in self.get_single_piece_bitboard(self.make_bitboard("B" if player == "white" else "b")):
-            B_moves_notation.update(self.return_diagonal_moves(Rpos, player, white_occ, black_occ))
+            B_moves_notation.append(self.return_diagonal_moves(Rpos, player, white_occ, black_occ))
 
-        P_moves_notation = set()
+        P_moves_notation = list()
         for Ppos in self.get_single_piece_bitboard(self.make_bitboard("P" if player == "white" else "p")):
-            P_moves_notation.update(self.return_pawn_moves(Ppos, player, white_occ, black_occ))
+            pawn = self.return_pawn_moves(Ppos, player, white_occ, black_occ)
+            print(pawn)
+            P_moves_notation.append(pawn)
 
-        N_moves_notation = set()
+        N_moves_notation = list()
         for Npos in self.get_single_piece_bitboard(self.make_bitboard("N" if player == "white" else "n")):
-            N_moves_notation.update(self.return_knight_moves(Npos, player, white_occ, black_occ))
+            N_moves_notation.append(self.return_knight_moves(Npos, player, white_occ, black_occ))
 
 
         return Q_moves_notation, R_moves_notation, B_moves_notation, P_moves_notation, N_moves_notation
@@ -322,11 +335,18 @@ class ChessLogic:
         return 
     
     def input_move(self, move, moveset):
-        for piece in moveset:
-
-            if move in piece:
-                return self.update_position(move)
-        raise Exception("Invalid Move") 
+        original_pos = move[:2]
+        new_pos = move[2:4]
+        original_pos_bit = self.turn_notation_binary(original_pos)
+        new_pos_bit = self.turn_notation_binary(new_pos)
+        for pieces in moveset:
+            for piece in pieces:
+                if original_pos_bit == piece[0]:
+                    for destination in piece[1]:
+                        if new_pos_bit == destination:
+                            self.update_position(move)
+                            return
+        raise Exception("Invalid move")
 
     def print_possible_moves(self, moveset):
         i = 0
@@ -343,9 +363,13 @@ class ChessLogic:
                 print("N",)
             i += 1
             for move in piece:
-                print(move, end = ", ")
+                for newpos in move[1]:
+                    print(self.bitboard_to_square(move[0]), end="")
+                    print(self.bitboard_to_square(newpos), end=", ")
             print("\n")
-    
+
+
+
     def print_board_from_dict(self, board_dict):
         # 1. Create an empty 8x8 grid represented by dots
         # We use a list of lists. Row 0 is Rank 8 (top), Row 7 is Rank 1 (bottom)
@@ -379,12 +403,12 @@ class ChessLogic:
     def run(self):
         if __name__ == "__main__":
             
-            """"
             while not self.is_checkmate():
                 # White
                 self.print_board_from_dict(self.current_board)
                 res = self.return_possible_moves("white")
                 self.print_possible_moves(res)
+                print(res)
                 move = str(input(f"Move: {self.current_move} What's your move?\n"))
                 self.input_move(move, res)
 
@@ -394,7 +418,6 @@ class ChessLogic:
                 self.print_possible_moves(res)
                 move = str(input(f"Move: {self.current_move} What's your move?\n"))
                 self.input_move(move, res)
-            """
 
 
 logic = ChessLogic()
