@@ -1,3 +1,5 @@
+import time
+from ChessAI import ChessAI
 class ChessLogic:
     global FILE_A
     global FILE_H
@@ -307,15 +309,15 @@ class ChessLogic:
         P_moves_notation = list()
         for Ppos in self.get_single_piece_bitboard(self.make_bitboard("P" if player == "white" else "p")):
             pawn = self.return_pawn_moves(Ppos, player, white_occ, black_occ)
-            print(pawn)
             P_moves_notation.append(pawn)
 
         N_moves_notation = list()
         for Npos in self.get_single_piece_bitboard(self.make_bitboard("N" if player == "white" else "n")):
             N_moves_notation.append(self.return_knight_moves(Npos, player, white_occ, black_occ))
 
+        K_moves_notation = list()
 
-        return Q_moves_notation, R_moves_notation, B_moves_notation, P_moves_notation, N_moves_notation
+        return Q_moves_notation, R_moves_notation, B_moves_notation, P_moves_notation, N_moves_notation, K_moves_notation
     
     def update_position(self, move):
         print(f"Updating position: {move}")
@@ -327,7 +329,7 @@ class ChessLogic:
             if new_pos in self.current_board.get(piece):
                 print("Removing Piece:", piece)
                 self.current_board[piece].remove(new_pos)
-            if promotion:
+            if promotion and original_pos in self.current_board.get(piece):
                 print("Moving and Promoting")
                 print(original_pos)
                 if self.current_move+1 % 2 == 1:
@@ -414,21 +416,30 @@ class ChessLogic:
 
     def run(self):
         if __name__ == "__main__":
-            
+            ai = ChessAI(self)
             while not self.is_checkmate():
+
+                
                 # White
+                start_time = time.time()
                 self.print_board_from_dict(self.current_board)
                 res = self.return_possible_moves("white")
+                end_time = time.time()
+                duration = end_time - start_time
                 self.print_possible_moves(res)
-                print(res)
+                print(f"\nTime taken: {duration:.4f} seconds")
                 move = str(input(f"Move: {self.current_move} What's your move?\n"))
                 self.input_move(move, res)
+                
 
                 # Black
-                self.print_board_from_dict(self.current_board)
+                start_time = time.time()
                 res = self.return_possible_moves("black")
-                self.print_possible_moves(res)
-                move = str(input(f"Move: {self.current_move} What's your move?\n"))
+                end_time = time.time()
+                duration = end_time - start_time
+                print(f"\nTime taken: {duration:.4f} seconds")
+                move = ai.random()
+                print(move)
                 self.input_move(move, res)
 
 
