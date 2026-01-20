@@ -22,6 +22,7 @@ class ChessLogic:
     def __init__(self):
         self.current_board = self.starting_pos()
         self.current_move = 0
+        self.history = set()
         
         # CREATE THE LOOKUP TABLE
         self.notation_map = {}
@@ -32,7 +33,6 @@ class ChessLogic:
                 shift = ((r - 1) * 8) + (7 - f_idx)
                 self.notation_map[f_char + str(r)] = 1 << shift
 
-    # Replace the old function with this:
     def turn_notation_binary(self, notation):
         return self.notation_map[notation]
 
@@ -40,9 +40,9 @@ class ChessLogic:
         #black lower case, white upper case
         starting_board_dict ={
             "r":["a8","h8"], "n":["b8","g8"], "b":["c8", "f8"], "k":["e8"], "q":["d8"],
-            "p":["a7","b7","c7","d7", "f7","g7","h7"],
+            "p":["a7","b7","c7","d7", "e7", "f7","g7","h7"],
             "R":["a1","h1"], "N":["b1","g1"], "B":["c1", "f1"], "K":["e1"], "Q":["d1"],
-            "P":["a2","b2","c2","d2","e7","f2","g2","h2"],
+            "P":["a2","b2","c2","d2","e2","f2","g2","h2"],
             
         }        
         return starting_board_dict
@@ -78,7 +78,6 @@ class ChessLogic:
     def is_check(self, king_bitboard, player):
         return
     
-
     def check_block(self, test_bitmap, player, white_occ, black_occ):
         # Determine "own" pieces based on player
         own_pieces = white_occ if player == "white" else black_occ
@@ -113,7 +112,7 @@ class ChessLogic:
             # Pass occupancies to check_block
             result = self.check_block(test, player, white_occ, black_occ)
             
-            if result == "break" or self.is_check(): # is_check() is still slow, but that's a separate fix
+            if result == "break" or self.is_check(move_piece_bitboard, player):
                 continue
             elif isinstance(result, int):
                 list_of_moves.append(result)
@@ -272,6 +271,30 @@ class ChessLogic:
 
         return (move_piece_bitboard, tuple(list_of_moves))
     
+    def check_castling(self, white_occ, black_occ, player):
+        both_occ = white_occ | black_occ
+        if player == "white":
+            Queen_side_mask = 0b01110000
+            King_side_mask = 0b00000110
+            if not "K moved" in self.history:
+                if Queen_side_mask & both_occ > 0 and King_side_mask & both_occ > 0:
+                    return(True, True)
+                elif Queen_side_mask & both_occ > 0:
+                    return(True, False)
+                elif King_side_mask & both_occ > 0:
+                    return(False, True)
+        else:
+            Queen_side_mask = 0b01110000_00000000_00000000_00000000_00000000_00000000_00000000_00000000
+            King_side_mask = 0b00000110_00000000_00000000_00000000_00000000_00000000_00000000_00000000
+            if not "k moved" in self.history:
+                if Queen_side_mask & both_occ > 0 and King_side_mask & both_occ > 0:
+                    return(True, True)
+                elif Queen_side_mask & both_occ > 0:
+                    return(True, False)
+                elif King_side_mask & both_occ > 0:
+                    return(False, True)
+        return (False, False)
+
     def get_single_piece_bitboard(self, bitboard):
         single_piece_bitboard_list = []
         
@@ -316,6 +339,8 @@ class ChessLogic:
             N_moves_notation.append(self.return_knight_moves(Npos, player, white_occ, black_occ))
 
         K_moves_notation = list()
+        for Kpos in self.get_single_piece_bitboard(self.make_bitboard("K" if player == "white" else "k")):
+            K_moves_notation.append(self.return_king_moves(Kpos, player, white_occ, black_occ))
 
         return Q_moves_notation, R_moves_notation, B_moves_notation, P_moves_notation, N_moves_notation, K_moves_notation
     
@@ -342,6 +367,10 @@ class ChessLogic:
                     self.current_board[promotion.lower()].append(new_pos)
             elif original_pos in self.current_board.get(piece):
                 print("Piece found:", piece)
+                if piece == "K":
+                    self.history.update("K moved")
+                elif piece =="k":
+                    self.history.update("k moved")
                 self.current_board[piece].remove(original_pos)
                 self.current_board[piece].append(new_pos)
         self.current_move += 1
@@ -375,14 +404,14 @@ class ChessLogic:
                 print("P")
             elif i == 4:
                 print("N",)
+            elif i == 5:
+                print("K")
             i += 1
             for move in piece:
                 for newpos in move[1]:
                     print(self.bitboard_to_square(move[0]), end="")
                     print(self.bitboard_to_square(newpos), "promote" if isinstance(newpos, tuple) else "", end=", ")
             print("\n")
-
-
 
     def print_board_from_dict(self, board_dict):
         # 1. Create an empty 8x8 grid represented by dots
@@ -412,7 +441,6 @@ class ChessLogic:
             print(f"{rank_label}|{' '.join(row)}|{rank_label}")
         print("  ---------------")
         print("  a b c d e f g h\n")
-
 
     def run(self):
         if __name__ == "__main__":
