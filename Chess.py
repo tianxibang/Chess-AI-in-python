@@ -39,10 +39,10 @@ class ChessLogic:
     def starting_pos(self):
         #black lower case, white upper case
         starting_board_dict ={
-            "r":["a8","h8"], "n":["b8","g8"], "b":["c8", "f8"], "k":["e8"], "q":["h4"],
-            "p":["a7","b7","c7","d7", "e6", "f7","g7","h7"],
+            "r":["a8","h8"], "n":["b8","g8"], "b":["c8", "f8"], "k":["e8"], "q":["d8"],
+            "p":["a7","b7","c7","d7","e7","f7","g7","h7"],
             "R":["a1","h1"], "N":["b1","g1"], "B":["c1", "f1"], "K":["e1"], "Q":["d1"],
-            "P":["a2","b2","c2","d2","e2","f3","g2","h2"],
+            "P":["a2","b2","c2","d2","e2","f2","g2","h2"],
             
         }        
         return starting_board_dict
@@ -196,7 +196,7 @@ class ChessLogic:
         # 4. DIAGONAL CHECK (Queens + Bishops)
         # ---------------------------------------------------------
         Black_QB = self.make_bitboard("q" if player == "white" else "Q") | self.make_bitboard("b" if player == "white" else "B") 
-        directionsQB = ((7, FILE_A), (9, FILE_H), (-7, FILE_A), (-9, FILE_H))
+        directionsQB = ((7, FILE_H), (9, FILE_A), (-7, FILE_A), (-9, FILE_H))
 
         for shift, edge_mask in directionsQB:
             test = king_bitboard
@@ -372,7 +372,7 @@ class ChessLogic:
       
     def return_diagonal_moves(self, move_piece_bitboard, player, white_occ, black_occ):
         list_of_moves = []
-        directions = ((7, FILE_A), (9, FILE_H), (-7, FILE_A), (-9, FILE_H))
+        directions = ((7, FILE_H), (9, FILE_A), (-7, FILE_A), (-9, FILE_H))
         king = self.make_bitboard("K" if player == "white" else "k")
         own_occ = white_occ if player == "white" else black_occ
         for shift, edge_mask in directions:
@@ -658,6 +658,8 @@ class ChessLogic:
         if __name__ == "__main__":
             ai = ChessAI(self)
             while True:
+                if self.current_move == 20:
+                    break
                 # -----------------------------------------
                 # WHITE'S TURN
                 # -----------------------------------------
@@ -684,7 +686,7 @@ class ChessLogic:
                 print(f"Moves calculated in: {duration:.4f} seconds")
                 
                 # 3. Get input and update
-                move = input(f"Move {self.current_move} (White): ")
+                move = ai.random("white")
                 self.input_move(move, res)
 
                 # -----------------------------------------
@@ -709,7 +711,7 @@ class ChessLogic:
                 self.print_possible_moves(res)
                 
                 # 3. Get input and update
-                move = input(f"Move {self.current_move} (Black): ")
+                move = ai.random("black")
                 self.input_move(move, res)
 
 

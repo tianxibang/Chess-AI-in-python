@@ -3,8 +3,8 @@ class ChessAI:
     def __init__(self, board_logic):
         self.board = board_logic
 
-    def random(self):
-        moves = self.board.return_possible_moves("black")
+    def random(self, player):
+        moves = self.board.return_possible_moves(player)
         moves_notation_list = list()
         for piece in moves:
             for moves in piece:
