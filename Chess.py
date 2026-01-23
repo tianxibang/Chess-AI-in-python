@@ -557,18 +557,18 @@ class ChessLogic:
         return Q_moves_notation, R_moves_notation, B_moves_notation, P_moves_notation, N_moves_notation, K_moves_notation
     
     def update_position(self, move):
-        print(f"Updating position: {move}")
+        # print(f"Updating position: {move}")
         original_pos = move[0:2]
         new_pos = move[2:4]
         promotion = move[4:5]
-        print("promotion value:", promotion)
+        # print("promotion value:", promotion)
         for piece in self.current_board:
             if new_pos in self.current_board.get(piece):
-                print("Removing Piece:", piece)
+                # print("Removing Piece:", piece)
                 self.current_board[piece].remove(new_pos)
             if promotion and original_pos in self.current_board.get(piece):
-                print("Moving and Promoting")
-                print(original_pos)
+                # print("Moving and Promoting")
+                # print(original_pos)
                 if self.current_move+1 % 2 == 1:
                     # white
                     self.current_board[piece].remove(original_pos)
@@ -578,7 +578,7 @@ class ChessLogic:
                     self.current_board[piece].remove(original_pos)
                     self.current_board[promotion.lower()].append(new_pos)
             elif original_pos in self.current_board.get(piece):
-                print("Piece found:", piece)
+                #print("Piece found:", piece)
                 if piece == "K":
                     self.history.update("K moved")
                 elif piece =="k":
@@ -713,7 +713,3 @@ class ChessLogic:
                 # 3. Get input and update
                 move = ai.random("black")
                 self.input_move(move, res)
-
-
-logic = ChessLogic()
-logic.run()   
