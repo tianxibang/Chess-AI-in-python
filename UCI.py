@@ -28,8 +28,8 @@ def main():
 
             # --- UCI HANDSHAKE ---
             if cmd == "uci":
-                print("id name PythonChessBot")
-                print("id author You")
+                print("Dumbo")
+                print("Yuna Bang")
                 print("uciok")
                 sys.stdout.flush()
 
@@ -59,7 +59,7 @@ def main():
                             logic.input_move(move, valid_moves)
                         except Exception:
                             # Ignore invalid moves sent by GUI to prevent crash
-                            pass
+                            raise "invalid move on engine side"
                         
                         # Flip turn
                         turn = "black" if turn == "white" else "white"

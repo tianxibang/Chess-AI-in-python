@@ -484,6 +484,7 @@ class ChessLogic:
         return (move_piece_bitboard, tuple(list_of_moves))
     
     def check_castling(self, white_occ, black_occ, player):
+        # CASTLE THROUGH CHECK STILL POSSIBLE!!!!
         both_occ = white_occ | black_occ
         if player == "white":
             Queen_side_mask = 0b01110000
@@ -553,11 +554,26 @@ class ChessLogic:
         K_moves_notation = list()
         for Kpos in self.get_single_piece_bitboard(self.make_bitboard("K" if player == "white" else "k")):
             K_moves_notation.append(self.return_king_moves(Kpos, player, white_occ, black_occ))
+        
+        if player == "white":
+            castling_bolean = self.check_castling(white_occ, black_occ, "white")
+            if castling_bolean[0] == True:
+                K_moves_notation.append("O-O-O")
+            if castling_bolean[1] == True:
+                K_moves_notation.append("O-O")
+        else:
+            castling_bolean = self.check_castling(white_occ, black_occ, "black")
+            if castling_bolean[0] == True:
+                K_moves_notation.append("O-O-O")
+            if castling_bolean[1] == True:
+                K_moves_notation.append("O-O")
+
 
         return Q_moves_notation, R_moves_notation, B_moves_notation, P_moves_notation, N_moves_notation, K_moves_notation
     
     def update_position(self, move):
         # print(f"Updating position: {move}")
+        # moves example e7e8q
         original_pos = move[0:2]
         new_pos = move[2:4]
         promotion = move[4:5]
@@ -589,6 +605,21 @@ class ChessLogic:
         return 
     
     def input_move(self, move, moveset):
+        if move == "O-O" or "O-O-O":
+            original_pos_bit = moveset[5][0]
+            moves = moveset[5][0][-2:]
+            if moves[0] == "O-O":
+                # Both castle possible
+                self.update_position(move)
+                return
+            elif moves[1] == "O-O-O":
+                self.update_position(move)
+                return
+            elif moves[1] == "O-O":
+                self.update_position(move)
+                return
+            raise Exception("Invalid move")
+
         original_pos = move[:2]
         new_pos = move[2:4]
         promotion = move[4:5]
