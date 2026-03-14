@@ -280,6 +280,11 @@ class ChessLogic:
         # Square is empty
         else:
             return
+
+    def is_legal_after_move(self, player, king_bitboard, own_occ, move_piece_bitboard, destination_bitboard):
+        temp_own_occ = (own_occ ^ move_piece_bitboard) | destination_bitboard
+        simulated_king = destination_bitboard if move_piece_bitboard == king_bitboard else king_bitboard
+        return not self.is_check(simulated_king, player, temp_own_occ)
         
     def return_king_moves(self, move_piece_bitboard, player, white_occ, black_occ):
         list_of_moves = []
@@ -289,6 +294,7 @@ class ChessLogic:
         )
         # Define own_occ locally for the simulation
         own_occ = white_occ if player == "white" else black_occ
+        king_bitboard = move_piece_bitboard
 
         for shift, edge_mask in directions:
             test = move_piece_bitboard
@@ -303,12 +309,8 @@ class ChessLogic:
             if result == "break":
                 continue
 
-            # 3. SIMULATE: Move King to 'test'
-            # We remove King from old spot (^ move_piece_bitboard) and add to new spot (| test)
-            temp_own_occ = (own_occ ^ move_piece_bitboard) | test
-
-            # 4. SAFETY CHECK: Is the NEW King position ('test') under attack?
-            if self.is_check(test, player, temp_own_occ):
+            # 3. SAFETY CHECK with simulated king position
+            if not self.is_legal_after_move(player, king_bitboard, own_occ, move_piece_bitboard, test):
                 continue
             
             # 5. Add valid move
@@ -332,11 +334,10 @@ class ChessLogic:
             if edge_mask and (test & edge_mask):
                 continue
             test = (test << shift) if shift > 0 else (test >> -shift)
-            temp_own_occ = (own_occ ^ move_piece_bitboard) | test
             # Pass occupancies to check_block
             result = self.check_block(test, player, white_occ, black_occ)
             
-            if result == "break" or self.is_check(king, player, temp_own_occ):
+            if result == "break" or not self.is_legal_after_move(player, king, own_occ, move_piece_bitboard, test):
                 continue
             elif isinstance(result, int):
                 list_of_moves.append(result)
@@ -356,11 +357,10 @@ class ChessLogic:
                 if edge_mask and (test & edge_mask):
                     break
                 test = (test << shift) if shift > 0 else (test >> -shift)
-                temp_own_occ = (own_occ ^ move_piece_bitboard) | test
                 # Pass occupancies to check_block
                 result = self.check_block(test, player, white_occ, black_occ)
 
-                if result == "break" or self.is_check(king, player, temp_own_occ):
+                if result == "break" or not self.is_legal_after_move(player, king, own_occ, move_piece_bitboard, test):
                     break
                 elif isinstance(result, int):
                     list_of_moves.append(result)
@@ -383,9 +383,8 @@ class ChessLogic:
                 test = (test << shift) if shift > 0 else (test >> -shift)
                 # Pass occupancies to check_block
                 result = self.check_block(test, player, white_occ, black_occ)
-                temp_own_occ = (own_occ ^ move_piece_bitboard) | test
 
-                if result == "break" or self.is_check(king, player, temp_own_occ):
+                if result == "break" or not self.is_legal_after_move(player, king, own_occ, move_piece_bitboard, test):
                     break
                 elif isinstance(result, int):
                     list_of_moves.append(result)
@@ -403,8 +402,7 @@ class ChessLogic:
         if player == "white":
             # 1. Forward Move (1 square)
             test = move_piece_bitboard << 8
-            temp_own_occ = (own_occ ^ move_piece_bitboard) | test
-            if (test != 0 and test < 18446744073709551616) and not (test & both_occ) and not self.is_check(king, player, temp_own_occ):
+            if (test != 0 and test < 18446744073709551616) and not (test & both_occ) and self.is_legal_after_move(player, king, own_occ, move_piece_bitboard, test):
                 # Promotion check
                 if test & RANK_EIGHT != 0:
                     list_of_moves.append((test, "promote"))
@@ -414,8 +412,7 @@ class ChessLogic:
             # 2. Double Forward Move (from Rank 2)
             if move_piece_bitboard & RANK_TWO:
                 test_double = move_piece_bitboard << 16
-                temp_own_occ = (own_occ ^ move_piece_bitboard) | test
-                if not (test_double & both_occ) and ((test_double >> 8) & both_occ) and not self.is_check(king, player, temp_own_occ):
+                if not (test_double & both_occ) and ((test_double >> 8) & both_occ) and self.is_legal_after_move(player, king, own_occ, move_piece_bitboard, test_double):
                     list_of_moves.append(test_double)
 
                 
@@ -423,8 +420,7 @@ class ChessLogic:
             # Must NOT be on File A to capture left
             if not (move_piece_bitboard & FILE_A):
                 capture_left = move_piece_bitboard << 9
-                temp_own_occ = (own_occ ^ move_piece_bitboard) | capture_left
-                if capture_left & black_occ and not self.is_check(king, player, temp_own_occ):
+                if capture_left & black_occ and self.is_legal_after_move(player, king, own_occ, move_piece_bitboard, capture_left):
                     if capture_left & RANK_EIGHT != 0:
                         list_of_moves.append((capture_left, "promote"))
                     else:
@@ -434,8 +430,7 @@ class ChessLogic:
             # Must NOT be on File H to capture right
             if not (move_piece_bitboard & FILE_H):
                 capture_right = move_piece_bitboard << 7
-                temp_own_occ = (own_occ ^ move_piece_bitboard) | capture_right
-                if capture_right & black_occ and not self.is_check(king, player, temp_own_occ):
+                if capture_right & black_occ and self.is_legal_after_move(player, king, own_occ, move_piece_bitboard, capture_right):
                     if capture_right & RANK_EIGHT != 0:
                         list_of_moves.append((capture_right, "promote"))
                     else:
@@ -443,8 +438,7 @@ class ChessLogic:
         else:
             # 1. Forward Move (1 square)
             test = move_piece_bitboard >> 8
-            temp_own_occ = (own_occ ^ move_piece_bitboard) | test
-            if (test != 0 and test < 18446744073709551616) and not (test & both_occ) and not self.is_check(king, player, temp_own_occ):
+            if (test != 0 and test < 18446744073709551616) and not (test & both_occ) and self.is_legal_after_move(player, king, own_occ, move_piece_bitboard, test):
                 # Promotion check
                 if test & RANK_EIGHT != 0:
                     list_of_moves.append((test, "promote"))
@@ -454,8 +448,7 @@ class ChessLogic:
             # 2. Double Forward Move (from Rank 2)
             if move_piece_bitboard & RANK_TWO:
                 test_double = move_piece_bitboard >> 16
-                temp_own_occ = (own_occ ^ move_piece_bitboard) | test
-                if not (test_double & both_occ) and ((test_double >> 8) & both_occ) and not self.is_check(king, player, temp_own_occ):
+                if not (test_double & both_occ) and ((test_double >> 8) & both_occ) and self.is_legal_after_move(player, king, own_occ, move_piece_bitboard, test_double):
                     list_of_moves.append(test_double)
 
                 
@@ -463,8 +456,7 @@ class ChessLogic:
             # Must NOT be on File A to capture left
             if not (move_piece_bitboard & FILE_A):
                 capture_left = move_piece_bitboard >> 9
-                temp_own_occ = (own_occ ^ move_piece_bitboard) | capture_left
-                if capture_left & black_occ and not self.is_check(king, player, temp_own_occ):
+                if capture_left & white_occ and self.is_legal_after_move(player, king, own_occ, move_piece_bitboard, capture_left):
                     if capture_left & RANK_EIGHT != 0:
                         list_of_moves.append((capture_left, "promote"))
                     else:
@@ -474,8 +466,7 @@ class ChessLogic:
             # Must NOT be on File H to capture right
             if not (move_piece_bitboard & FILE_H):
                 capture_right = move_piece_bitboard >> 7
-                temp_own_occ = (own_occ ^ move_piece_bitboard) | capture_right
-                if capture_right & black_occ and not self.is_check(king, player, temp_own_occ):
+                if capture_right & white_occ and self.is_legal_after_move(player, king, own_occ, move_piece_bitboard, capture_right):
                     if capture_right & RANK_EIGHT != 0:
                         list_of_moves.append((capture_right, "promote"))
                     else:
@@ -484,29 +475,44 @@ class ChessLogic:
         return (move_piece_bitboard, tuple(list_of_moves))
     
     def check_castling(self, white_occ, black_occ, player):
-        # CASTLE THROUGH CHECK STILL POSSIBLE!!!!
         both_occ = white_occ | black_occ
         if player == "white":
-            Queen_side_mask = 0b01110000
-            King_side_mask = 0b00000110
-            if not "K moved" in self.history:
-                if Queen_side_mask & both_occ > 0 and King_side_mask & both_occ > 0:
-                    return(True, True)
-                elif Queen_side_mask & both_occ > 0:
-                    return(True, False)
-                elif King_side_mask & both_occ > 0:
-                    return(False, True)
+            queen_side_clear = (0b01110000 & both_occ) == 0
+            king_side_clear = (0b00000110 & both_occ) == 0
+            if "K moved" not in self.history:
+                return (queen_side_clear, king_side_clear)
         else:
-            Queen_side_mask = 0b01110000_00000000_00000000_00000000_00000000_00000000_00000000_00000000
-            King_side_mask = 0b00000110_00000000_00000000_00000000_00000000_00000000_00000000_00000000
-            if not "k moved" in self.history:
-                if Queen_side_mask & both_occ > 0 and King_side_mask & both_occ > 0:
-                    return(True, True)
-                elif Queen_side_mask & both_occ > 0:
-                    return(True, False)
-                elif King_side_mask & both_occ > 0:
-                    return(False, True)
+            queen_side_clear = (0b01110000_00000000_00000000_00000000_00000000_00000000_00000000_00000000 & both_occ) == 0
+            king_side_clear = (0b00000110_00000000_00000000_00000000_00000000_00000000_00000000_00000000 & both_occ) == 0
+            if "k moved" not in self.history:
+                return (queen_side_clear, king_side_clear)
         return (False, False)
+
+    def update_castle_position(self, move, player):
+        if player == "white":
+            king_piece, rook_piece = "K", "R"
+            if move == "O-O":
+                king_from, king_to, rook_from, rook_to = "e1", "g1", "h1", "f1"
+            else:
+                king_from, king_to, rook_from, rook_to = "e1", "c1", "a1", "d1"
+            self.history.update("K moved")
+        else:
+            king_piece, rook_piece = "k", "r"
+            if move == "O-O":
+                king_from, king_to, rook_from, rook_to = "e8", "g8", "h8", "f8"
+            else:
+                king_from, king_to, rook_from, rook_to = "e8", "c8", "a8", "d8"
+            self.history.update("k moved")
+
+        if king_from in self.current_board[king_piece]:
+            self.current_board[king_piece].remove(king_from)
+            self.current_board[king_piece].append(king_to)
+        if rook_from in self.current_board[rook_piece]:
+            self.current_board[rook_piece].remove(rook_from)
+            self.current_board[rook_piece].append(rook_to)
+
+        self.current_move += 1
+        return
 
     def get_single_piece_bitboard(self, bitboard):
         single_piece_bitboard_list = []
@@ -604,21 +610,18 @@ class ChessLogic:
         self.current_move += 1
         return 
     
-    def input_move(self, move, moveset):
-        if move == "O-O" or "O-O-O":
-            original_pos_bit = moveset[5][0]
-            moves = moveset[5][0][-2:]
-            if moves[0] == "O-O":
-                # Both castle possible
-                self.update_position(move)
-                return
-            elif moves[1] == "O-O-O":
-                self.update_position(move)
-                return
-            elif moves[1] == "O-O":
-                self.update_position(move)
-                return
-            raise Exception("Invalid move")
+    def input_move(self, move, moveset, player=None):
+        if move in ("O-O", "O-O-O"):
+            available_castles = [castle for castle in moveset[5] if isinstance(castle, str)]
+            if move not in available_castles:
+                raise Exception("Invalid move")
+
+            # Prefer explicit player (best for search/test trees); fallback to turn counter.
+            if player is None:
+                player = "white" if self.current_move % 2 == 0 else "black"
+
+            self.update_castle_position(move, player)
+            return
 
         original_pos = move[:2]
         new_pos = move[2:4]
@@ -718,7 +721,7 @@ class ChessLogic:
                 
                 # 3. Get input and update
                 move = ai.random("white")
-                self.input_move(move, res)
+                self.input_move(move, res, "white")
 
                 # -----------------------------------------
                 # BLACK'S TURN
@@ -743,4 +746,4 @@ class ChessLogic:
                 
                 # 3. Get input and update
                 move = ai.random("black")
-                self.input_move(move, res)
+                self.input_move(move, res, "black")

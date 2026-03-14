@@ -56,7 +56,7 @@ def main():
                         # because input_move checks validity against them.
                         valid_moves = logic.return_possible_moves(turn)
                         try:
-                            logic.input_move(move, valid_moves)
+                            logic.input_move(move, valid_moves, turn)
                         except Exception:
                             # Ignore invalid moves sent by GUI to prevent crash
                             raise "invalid move on engine side"
@@ -80,7 +80,7 @@ def main():
                 
                 if best_move:
                     # Apply it internally to keep sync (optional but safer)
-                    logic.input_move(best_move, valid_moves)
+                    logic.input_move(best_move, valid_moves, turn)
                     turn = "black" if turn == "white" else "white"
                     print(f"bestmove {best_move}")
                 else:

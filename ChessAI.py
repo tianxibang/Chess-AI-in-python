@@ -9,6 +9,9 @@ class ChessAI:
         
         for piece_moves in moves:
             for move_data in piece_moves:
+                if isinstance(move_data, str):
+                    moves_notation_list.append(move_data)
+                    continue
                 # move_data is typically [origin_bitboard, [dest_bitboards...]]
                 origin_bit = move_data[0]
                 destinations = move_data[1]
