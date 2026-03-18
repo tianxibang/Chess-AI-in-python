@@ -412,7 +412,7 @@ class ChessLogic:
             # 2. Double Forward Move (from Rank 2)
             if move_piece_bitboard & RANK_TWO:
                 test_double = move_piece_bitboard << 16
-                if not (test_double & both_occ) and ((test_double >> 8) & both_occ) and self.is_legal_after_move(player, king, own_occ, move_piece_bitboard, test_double):
+                if not (test_double & both_occ) and not ((test_double >> 8) & both_occ) and self.is_legal_after_move(player, king, own_occ, move_piece_bitboard, test_double):
                     list_of_moves.append(test_double)
 
                 
@@ -439,16 +439,16 @@ class ChessLogic:
             # 1. Forward Move (1 square)
             test = move_piece_bitboard >> 8
             if (test != 0 and test < 18446744073709551616) and not (test & both_occ) and self.is_legal_after_move(player, king, own_occ, move_piece_bitboard, test):
-                # Promotion check
-                if test & RANK_EIGHT != 0:
+                # Promotion check: black promotes on rank 1
+                if test & RANK_ONE != 0:
                     list_of_moves.append((test, "promote"))
                 else:
                     list_of_moves.append(test)
                 
-            # 2. Double Forward Move (from Rank 2)
-            if move_piece_bitboard & RANK_TWO:
+            # 2. Double Forward Move (from Rank 7)
+            if move_piece_bitboard & RANK_SEVEN:
                 test_double = move_piece_bitboard >> 16
-                if not (test_double & both_occ) and ((test_double >> 8) & both_occ) and self.is_legal_after_move(player, king, own_occ, move_piece_bitboard, test_double):
+                if not (test_double & both_occ) and not ((test_double << 8) & both_occ) and self.is_legal_after_move(player, king, own_occ, move_piece_bitboard, test_double):
                     list_of_moves.append(test_double)
 
                 
@@ -457,7 +457,7 @@ class ChessLogic:
             if not (move_piece_bitboard & FILE_A):
                 capture_left = move_piece_bitboard >> 9
                 if capture_left & white_occ and self.is_legal_after_move(player, king, own_occ, move_piece_bitboard, capture_left):
-                    if capture_left & RANK_EIGHT != 0:
+                    if capture_left & RANK_ONE != 0:
                         list_of_moves.append((capture_left, "promote"))
                     else:
                         list_of_moves.append(capture_left)
@@ -467,7 +467,7 @@ class ChessLogic:
             if not (move_piece_bitboard & FILE_H):
                 capture_right = move_piece_bitboard >> 7
                 if capture_right & white_occ and self.is_legal_after_move(player, king, own_occ, move_piece_bitboard, capture_right):
-                    if capture_right & RANK_EIGHT != 0:
+                    if capture_right & RANK_ONE != 0:
                         list_of_moves.append((capture_right, "promote"))
                     else:
                         list_of_moves.append(capture_right)
@@ -477,42 +477,17 @@ class ChessLogic:
     def check_castling(self, white_occ, black_occ, player):
         both_occ = white_occ | black_occ
         if player == "white":
-            queen_side_clear = (0b01110000 & both_occ) == 0
-            king_side_clear = (0b00000110 & both_occ) == 0
-            if "K moved" not in self.history:
-                return (queen_side_clear, king_side_clear)
+            if "K moved" in self.history:
+                return (False, False)
+            queen_side = (0b01110000 & both_occ) == 0 and "Ra1 moved" not in self.history
+            king_side  = (0b00000110 & both_occ) == 0 and "Rh1 moved" not in self.history
+            return (queen_side, king_side)
         else:
-            queen_side_clear = (0b01110000_00000000_00000000_00000000_00000000_00000000_00000000_00000000 & both_occ) == 0
-            king_side_clear = (0b00000110_00000000_00000000_00000000_00000000_00000000_00000000_00000000 & both_occ) == 0
-            if "k moved" not in self.history:
-                return (queen_side_clear, king_side_clear)
-        return (False, False)
-
-    def update_castle_position(self, move, player):
-        if player == "white":
-            king_piece, rook_piece = "K", "R"
-            if move == "O-O":
-                king_from, king_to, rook_from, rook_to = "e1", "g1", "h1", "f1"
-            else:
-                king_from, king_to, rook_from, rook_to = "e1", "c1", "a1", "d1"
-            self.history.update("K moved")
-        else:
-            king_piece, rook_piece = "k", "r"
-            if move == "O-O":
-                king_from, king_to, rook_from, rook_to = "e8", "g8", "h8", "f8"
-            else:
-                king_from, king_to, rook_from, rook_to = "e8", "c8", "a8", "d8"
-            self.history.update("k moved")
-
-        if king_from in self.current_board[king_piece]:
-            self.current_board[king_piece].remove(king_from)
-            self.current_board[king_piece].append(king_to)
-        if rook_from in self.current_board[rook_piece]:
-            self.current_board[rook_piece].remove(rook_from)
-            self.current_board[rook_piece].append(rook_to)
-
-        self.current_move += 1
-        return
+            if "k moved" in self.history:
+                return (False, False)
+            queen_side = (0b01110000_00000000_00000000_00000000_00000000_00000000_00000000_00000000 & both_occ) == 0 and "ra8 moved" not in self.history
+            king_side  = (0b00000110_00000000_00000000_00000000_00000000_00000000_00000000_00000000 & both_occ) == 0 and "rh8 moved" not in self.history
+            return (queen_side, king_side)
 
     def get_single_piece_bitboard(self, bitboard):
         single_piece_bitboard_list = []
@@ -561,79 +536,84 @@ class ChessLogic:
         for Kpos in self.get_single_piece_bitboard(self.make_bitboard("K" if player == "white" else "k")):
             K_moves_notation.append(self.return_king_moves(Kpos, player, white_occ, black_occ))
         
-        if player == "white":
-            castling_bolean = self.check_castling(white_occ, black_occ, "white")
-            if castling_bolean[0] == True:
-                K_moves_notation.append("O-O-O")
-            if castling_bolean[1] == True:
-                K_moves_notation.append("O-O")
-        else:
-            castling_bolean = self.check_castling(white_occ, black_occ, "black")
-            if castling_bolean[0] == True:
-                K_moves_notation.append("O-O-O")
-            if castling_bolean[1] == True:
-                K_moves_notation.append("O-O")
+        castling_bolean = self.check_castling(white_occ, black_occ, player)
+        if K_moves_notation and (castling_bolean[0] or castling_bolean[1]):
+            king_origin, king_dests = K_moves_notation[0]
+            own_occ = white_occ if player == "white" else black_occ
+            # Can't castle while in check
+            currently_in_check = self.is_check(king_origin, player, own_occ)
+            extra = []
+            if castling_bolean[0] and not currently_in_check:  # queenside
+                through = king_origin << 1   # d1 / d8
+                dest    = king_origin << 2   # c1 / c8
+                if (self.is_legal_after_move(player, king_origin, own_occ, king_origin, through) and
+                    self.is_legal_after_move(player, king_origin, own_occ, king_origin, dest)):
+                    extra.append(dest)
+            if castling_bolean[1] and not currently_in_check:  # kingside
+                through = king_origin >> 1   # f1 / f8
+                dest    = king_origin >> 2   # g1 / g8
+                if (self.is_legal_after_move(player, king_origin, own_occ, king_origin, through) and
+                    self.is_legal_after_move(player, king_origin, own_occ, king_origin, dest)):
+                    extra.append(dest)
+            K_moves_notation[0] = (king_origin, king_dests + tuple(extra))
 
 
         return Q_moves_notation, R_moves_notation, B_moves_notation, P_moves_notation, N_moves_notation, K_moves_notation
     
-    def update_position(self, move):
-        # print(f"Updating position: {move}")
-        # moves example e7e8q
+    def update_position(self, move, player):
         original_pos = move[0:2]
         new_pos = move[2:4]
         promotion = move[4:5]
-        # print("promotion value:", promotion)
         for piece in self.current_board:
             if new_pos in self.current_board.get(piece):
-                # print("Removing Piece:", piece)
                 self.current_board[piece].remove(new_pos)
             if promotion and original_pos in self.current_board.get(piece):
-                # print("Moving and Promoting")
-                # print(original_pos)
-                if self.current_move+1 % 2 == 1:
-                    # white
-                    self.current_board[piece].remove(original_pos)
+                self.current_board[piece].remove(original_pos)
+                if player == "white":
                     self.current_board[promotion.upper()].append(new_pos)
                 else:
-                    # black
-                    self.current_board[piece].remove(original_pos)
                     self.current_board[promotion.lower()].append(new_pos)
             elif original_pos in self.current_board.get(piece):
-                #print("Piece found:", piece)
                 if piece == "K":
-                    self.history.update("K moved")
-                elif piece =="k":
-                    self.history.update("k moved")
+                    self.history.add("K moved")
+                elif piece == "k":
+                    self.history.add("k moved")
+                elif piece == "R":
+                    if original_pos == "a1": self.history.add("Ra1 moved")
+                    elif original_pos == "h1": self.history.add("Rh1 moved")
+                elif piece == "r":
+                    if original_pos == "a8": self.history.add("ra8 moved")
+                    elif original_pos == "h8": self.history.add("rh8 moved")
                 self.current_board[piece].remove(original_pos)
                 self.current_board[piece].append(new_pos)
+
+        # If the king just moved 2 squares, also move the rook
+        if original_pos == "e1" and new_pos == "g1":
+            self.current_board["R"].remove("h1"); self.current_board["R"].append("f1")
+        elif original_pos == "e1" and new_pos == "c1":
+            self.current_board["R"].remove("a1"); self.current_board["R"].append("d1")
+        elif original_pos == "e8" and new_pos == "g8":
+            self.current_board["r"].remove("h8"); self.current_board["r"].append("f8")
+        elif original_pos == "e8" and new_pos == "c8":
+            self.current_board["r"].remove("a8"); self.current_board["r"].append("d8")
+
         self.current_move += 1
-        return 
+        return
     
     def input_move(self, move, moveset, player=None):
-        if move in ("O-O", "O-O-O"):
-            available_castles = [castle for castle in moveset[5] if isinstance(castle, str)]
-            if move not in available_castles:
-                raise Exception("Invalid move")
-
-            # Prefer explicit player (best for search/test trees); fallback to turn counter.
-            if player is None:
-                player = "white" if self.current_move % 2 == 0 else "black"
-
-            self.update_castle_position(move, player)
-            return
-
         original_pos = move[:2]
         new_pos = move[2:4]
         promotion = move[4:5]
         original_pos_bit = self.turn_notation_binary(original_pos)
         new_pos_bit = self.turn_notation_binary(new_pos)
+        if player is None:
+            player = "white" if self.current_move % 2 == 0 else "black"
         for pieces in moveset:
             for piece in pieces:
                 if original_pos_bit == piece[0]:
                     for destination in piece[1]:
-                        if new_pos_bit == destination[0] if promotion else destination:
-                            self.update_position(move)
+                        if new_pos_bit == (destination[0] if promotion else destination):
+                            self.update_position(move, player)
                             return
         raise Exception("Invalid move")
 
